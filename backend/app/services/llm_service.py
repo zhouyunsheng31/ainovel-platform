@@ -82,15 +82,21 @@ class LLMService:
         enhanced_prompt = f"{system_prompt}\n\n请只返回有效 JSON 对象，不要使用 Markdown 代码块，不要补充解释。"
         response = await self.invoke(enhanced_prompt, user_input)
 
+        def _remove_trailing_commas(text: str) -> str:
+            text = re.sub(r',\s*([}\]])', r'\1', text)
+            return text
+
         try:
             cleaned = response.strip()
             if cleaned.startswith("```"):
                 cleaned = re.sub(r"^```json\s*|^```\s*|```$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE).strip()
+            cleaned = _remove_trailing_commas(cleaned)
             return json.loads(cleaned)
         except json.JSONDecodeError:
             json_match = re.search(r'\{[\s\S]*\}', response)
             if json_match:
-                return json.loads(json_match.group())
+                extracted = _remove_trailing_commas(json_match.group())
+                return json.loads(extracted)
             raise ValueError(f"Failed to parse JSON response: {response}")
 
     async def batch_invoke(
