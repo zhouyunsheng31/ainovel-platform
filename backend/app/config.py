@@ -1,7 +1,7 @@
 """
 AI小说拆书系统 - 配置模块
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
@@ -41,9 +41,10 @@ class Settings(BaseSettings):
     # 并发配置
     max_concurrent_llm_calls: int = 10  # 最大并行LLM调用数
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8"
+    )
 
 
 # 全局配置实例
