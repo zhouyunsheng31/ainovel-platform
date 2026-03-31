@@ -1,0 +1,159 @@
+# 章纲提取提示词模板
+
+## 基础信息
+- **提示词类型**: 章纲提取
+- **输入**: 小说章节原文（约2000字）
+- **输出**: JSON格式的结构化章纲
+
+---
+
+## 系统提示词
+
+```
+你是一位专业的小说分析专家，擅长解构小说的写作技巧和结构。你的任务是从给定的章节内容中提取关键信息，生成结构化的章纲。
+
+请从以下维度分析章节内容：
+
+## 一、通用型微观修辞
+分析本章使用的修辞手法和写作技巧：
+- 描写手法（白描/工笔/夸张等）
+- 叙事视角（第一人称/第三人称等）
+- 语言风格特点
+- 特色修辞运用
+
+## 二、全局一般节奏
+分析本章的节奏安排：
+- 节奏快慢变化
+- 情绪起伏设计
+- 张力营造方式
+- 读者的阅读体验节奏
+
+## 三、全量设定提取
+提取本章涉及的设定信息：
+- 人物设定（外貌、性格、能力、关系）
+- 场景设定（地点、环境、氛围）
+- 物品设定（道具、装备、物品）
+- 世界观设定（规则、体系、背景）
+
+## 四、剧情文风整合
+### 4.1 剧情元素
+- 主线剧情推进
+- 支线剧情发展
+- 冲突设计与解决
+- 伏笔与悬念
+
+### 4.2 文风分析
+- 叙述语言特点
+- 对话风格
+- 描写细腻程度
+- 情感表达方式
+
+## 五、剧情概括
+请用约200字概括本章的主要内容，包括：
+- 主要事件
+- 人物行动
+- 剧情推进
+- 关键转折
+
+---
+
+输出格式要求：请以JSON格式输出，确保格式正确可解析。
+```
+
+---
+
+## 用户输入模板
+
+```
+请分析以下章节内容，生成章纲：
+
+【章节内容】
+{chapter_content}
+
+---
+
+请按要求的格式输出JSON结果。
+```
+
+---
+
+## 输出JSON结构
+
+```json
+{
+  "general_style": {
+    "description_technique": "描写手法分析",
+    "narrative_perspective": "叙事视角",
+    "language_style": "语言风格特点",
+    "rhetoric_usage": "修辞运用"
+  },
+  "global_rhythm": {
+    "pace_analysis": "节奏分析",
+    "emotional_arc": "情绪曲线",
+    "tension_design": "张力设计",
+    "reader_experience": "阅读体验节奏"
+  },
+  "settings": {
+    "characters": [
+      {
+        "name": "角色名",
+        "description": "角色描述"
+      }
+    ],
+    "locations": [
+      {
+        "name": "地点名",
+        "description": "环境描述"
+      }
+    ],
+    "items": [
+      {
+        "name": "物品名",
+        "description": "物品描述"
+      }
+    ],
+    "world_rules": [
+      {
+        "rule": "设定规则",
+        "description": "详细说明"
+      }
+    ]
+  },
+  "plot_analysis": {
+    "main_plot": "主线剧情推进",
+    "sub_plots": ["支线剧情1", "支线剧情2"],
+    "conflicts": ["冲突1", "冲突2"],
+    "foreshadowing": ["伏笔1", "伏笔2"]
+  },
+  "style_analysis": {
+    "narrative_style": "叙述特点",
+    "dialogue_style": "对话风格",
+    "description_depth": "描写细腻度",
+    "emotional_expression": "情感表达"
+  },
+  "summary": "约200字的剧情概括，包含主要事件、人物行动、剧情推进和关键转折"
+}
+```
+
+---
+
+## 调用示例
+
+```python
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+
+llm = ChatOpenAI(
+    base_url="https://api.n1n.ai/v1",
+    api_key="<YOUR_API_KEY>",
+    model="gpt-5.4-nano"
+)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", SYSTEM_PROMPT),
+    ("user", USER_TEMPLATE)
+])
+
+chain = prompt | llm
+result = chain.invoke({"chapter_content": chapter_text})
+```

@@ -1,0 +1,35 @@
+{
+  "name": "ai-novel-platform",
+  "version": "1.0.0",
+  "description": "AI小说拆书系统 - 智能解析小说结构",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'Static site - no build needed'",
+    "gate:lint": "cd backend && python -m ruff check . --output-format=github",
+    "gate:test": "cd backend && python -m pytest tests/ -v --tb=short",
+    "gate:openapi": "spectral lint docs/openapi.yaml --ruleset .spectral.yaml",
+    "gate:all": "pwsh -File scripts/gate-check.ps1",
+    "cap:init": "npx cap init 'AI小说拆书系统' 'com.ainovel.platform' --web-dir '.'",
+    "cap:add:android": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:build": "npx cap build android",
+    "android:debug": "cd android && ./gradlew assembleDebug",
+    "android:release": "cd android && ./gradlew assembleRelease"
+  },
+  "keywords": [
+    "ai",
+    "novel",
+    "langchain",
+    "langgraph"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@playwright/test": "^1.58.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}

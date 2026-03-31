@@ -1,0 +1,922 @@
+openapi: 3.1.0
+info:
+  title: AI小说平台 - 拆书系统 API
+  version: 1.0.0
+  summary: 面向小B端的 AI 小说拆书系统接口契约
+  description: |
+    提供小说上传、处理状态跟踪、纲树查询、纲详情查看、错误日志查询与实时进度推送能力。
+    本契约基于现有《API接口设计文档》整理为 OpenAPI 文档，用于前后端联调、Mock Server 生成与后续 CI 契约校验。
+  contact:
+    name: AI小说平台开发团队
+    url: https://github.com/example/ai-novel-platform
+servers:
+  - url: /api/v1
+    description: 相对路径（同域部署）
+tags:
+  - name: Books
+    description: 书籍上传、查询、删除
+  - name: Outlines
+    description: 纲树、纲详情、复制
+  - name: Tasks
+    description: 任务状态与错误日志
+  - name: WebSocket
+    description: 实时进度推送
+
+paths:
+  /books/upload:
+    post:
+      tags: [Books]
+      summary: 上传书籍文件
+      description: 上传 epub/txt/doc/docx/pdf 文件，并创建处理任务。
+      operationId: uploadBook
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 书籍文件
+                title:
+                  type: string
+                  description: 书名，默认取文件名
+                author:
+                  type: string
+                  description: 作者
+      responses:
+        '200':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadBookResponse'
+        '400':
+          description: 参数错误或文件格式不支持
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: 文件过大
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /books:
+    get:
+      tags: [Books]
+      summary: 获取书籍列表
+      description: 分页查询书籍列表，支持按状态筛选、按字段排序。返回书籍摘要信息及分页元数据。
+      operationId: listBooks
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/BookStatus'
+          description: 按状态筛选
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [createdAt, title, status]
+        - name: sortOrder
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookListResponse'
+
+  /books/{bookId}:
+    get:
+      tags: [Books]
+      summary: 获取书籍详情
+      description: 根据书籍ID查询详细信息，包含文件编码、章节总数、处理状态等完整字段。
+      operationId: getBookDetail
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookDetailResponse'
+        '404':
+          description: 书籍不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Books]
+      summary: 删除书籍
+      description: 根据书籍ID删除书籍记录及其关联的所有纲数据，操作不可逆。
+      operationId: deleteBook
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteBookResponse'
+        '404':
+          description: 书籍不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /books/{bookId}/tree:
+    get:
+      tags: [Outlines]
+      summary: 获取纲树结构
+      description: 返回指定书籍的完整纲层级树结构，用于前端树图展示。
+      operationId: getOutlineTree
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlineTreeResponse'
+        '404':
+          description: 书籍不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /books/{bookId}/status:
+    get:
+      tags: [Tasks]
+      summary: 获取书籍当前处理状态
+      description: 便于通过书籍维度查询最新处理信息。该接口当前返回轻量状态对象，而非完整 TaskStatusResponse。
+      operationId: getBookProcessingStatus
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookProcessingStatusResponse'
+        '404':
+          description: 书籍不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /outlines/{outlineId}:
+    get:
+      tags: [Outlines]
+      summary: 获取纲详情
+      description: 根据纲ID查询完整的纲内容，包含章纲（含风格、节奏、场景模板）或通用纲结构化数据。
+      operationId: getOutlineDetail
+      parameters:
+        - $ref: '#/components/parameters/OutlineId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlineDetailResponse'
+        '404':
+          description: 纲不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /outlines/{outlineId}/copy:
+    post:
+      tags: [Outlines]
+      summary: 获取可复制的纲内容
+      description: 由服务端组装统一文案，便于前端一键复制。
+      operationId: copyOutlineContent
+      parameters:
+        - $ref: '#/components/parameters/OutlineId'
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [text, json, markdown]
+            default: text
+          description: 导出格式，当前实现支持 text/json/markdown 三种格式
+      responses:
+        '200':
+          description: 生成复制内容成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyOutlineResponse'
+        '404':
+          description: 纲不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /tasks/{taskId}:
+    get:
+      tags: [Tasks]
+      summary: 获取任务状态
+      description: 查询拆书任务的实时处理状态，包含当前阶段、各阶段进度百分比、已完成章节数及预估剩余时间。
+      operationId: getTaskStatus
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskStatusResponse'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /tasks/{taskId}/errors:
+    get:
+      tags: [Tasks]
+      summary: 获取任务错误日志
+      description: 分页查询指定任务在处理过程中产生的错误记录，包含错误类型、所属阶段、发生时间等详细信息。
+      operationId: getTaskErrors
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskErrorsResponse'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /ws/{taskId}:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket 实时进度推送入口
+      description: |
+        WebSocket 握手地址。OpenAPI 仅做入口说明，消息体结构见下方 x-websocket-messages。
+      operationId: connectTaskWebSocket
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '101':
+          description: Switching Protocols — WebSocket 握手成功，连接升级为双向通信。
+        '200':
+          description: WebSocket 连接已就绪（HTTP 回退模式下返回连接确认）。
+      x-websocket-messages:
+        progress:
+          payload:
+            $ref: '#/components/schemas/WebSocketProgressPayload'
+        outline_update:
+          payload:
+            $ref: '#/components/schemas/WebSocketOutlineUpdatePayload'
+        error:
+          payload:
+            $ref: '#/components/schemas/WebSocketErrorPayload'
+        completed:
+          payload:
+            $ref: '#/components/schemas/WebSocketCompletedPayload'
+
+components:
+  parameters:
+    BookId:
+      name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 书籍ID
+    OutlineId:
+      name: outlineId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 纲ID
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 任务ID
+
+  schemas:
+    ApiEnvelope:
+      type: object
+      required: [success, timestamp]
+      properties:
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorInfo:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_FILE_FORMAT
+            - FILE_TOO_LARGE
+            - ENCODING_DETECTION_FAILED
+            - BOOK_NOT_FOUND
+            - OUTLINE_NOT_FOUND
+            - TASK_NOT_FOUND
+            - PROCESSING_FAILED
+            - LLM_ERROR
+            - INTERNAL_ERROR
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, error, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: false
+            data:
+              type: object
+              nullable: true
+              additionalProperties: true
+            error:
+              $ref: '#/components/schemas/ErrorInfo'
+
+    BookStatus:
+      type: string
+      enum: [IDLE, PROCESSING, COMPLETED, ERROR]
+
+    ProcessingStage:
+      type: string
+      enum:
+        - FILE_UPLOAD
+        - TEXT_PREPROCESS
+        - CHAPTER_OUTLINE
+        - COARSE_OUTLINE
+        - MAIN_OUTLINE
+        - WORLD_OUTLINE
+
+    OutlineType:
+      type: string
+      enum: [CHAPTER, COARSE, MAIN, WORLD]
+
+    OutlineStatus:
+      type: string
+      enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+
+    UploadBookData:
+      type: object
+      required: [bookId, taskId, fileName, fileSize, status, message]
+      properties:
+        bookId:
+          type: string
+        taskId:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        status:
+          type: string
+          enum: [UPLOADING]
+        message:
+          type: string
+
+    UploadBookResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/UploadBookData'
+
+    BookSummary:
+      type: object
+      required:
+        [bookId, title, originalName, fileType, fileSize, totalChapters, status, createdAt, updatedAt]
+      properties:
+        bookId:
+          type: string
+        title:
+          type: string
+        originalName:
+          type: string
+        fileType:
+          type: string
+          enum: [TXT, EPUB, DOC, DOCX, PDF]
+        fileSize:
+          type: integer
+        totalChapters:
+          type: integer
+        status:
+          $ref: '#/components/schemas/BookStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    BookListData:
+      type: object
+      required: [books, pagination]
+      properties:
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    BookListResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/BookListData'
+
+    BookDetail:
+      allOf:
+        - $ref: '#/components/schemas/BookSummary'
+        - type: object
+          required: [encoding]
+          properties:
+            encoding:
+              type: string
+
+    BookDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/BookDetail'
+
+    DeleteBookData:
+      type: object
+      required: [bookId, message]
+      properties:
+        bookId:
+          type: string
+        message:
+          type: string
+
+    DeleteBookResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/DeleteBookData'
+
+    OutlineTreeNode:
+      type: object
+      required: [outlineId, outlineType, label, status, childCount, children]
+      properties:
+        outlineId:
+          type: string
+        outlineType:
+          $ref: '#/components/schemas/OutlineType'
+        outlineIndex:
+          type: integer
+        label:
+          type: string
+        summary:
+          type: string
+        status:
+          type: string
+        chapterRange:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: integer
+        childCount:
+          type: integer
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/OutlineTreeNode'
+
+    OutlineTreeData:
+      type: object
+      required: [bookId, tree]
+      properties:
+        bookId:
+          type: string
+        tree:
+          $ref: '#/components/schemas/OutlineTreeNode'
+
+    OutlineTreeResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/OutlineTreeData'
+
+    ChapterOutlineContent:
+      type: object
+      properties:
+        generalStyle:
+          type: string
+        globalVisualRhythm:
+          type: string
+        settingsTemplate:
+          type: object
+          additionalProperties: true
+        plotStyleIntegration:
+          type: object
+          additionalProperties: true
+        summary:
+          type: string
+
+    GenericOutlineContent:
+      type: object
+      additionalProperties: true
+
+    OutlineDetailData:
+      type: object
+      required: [outlineId, bookId, outlineType, status, content, summary, createdAt]
+      properties:
+        outlineId:
+          type: string
+        bookId:
+          type: string
+        outlineType:
+          $ref: '#/components/schemas/OutlineType'
+        chapterIndex:
+          type: integer
+        status:
+          $ref: '#/components/schemas/OutlineStatus'
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/ChapterOutlineContent'
+            - $ref: '#/components/schemas/GenericOutlineContent'
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    OutlineDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/OutlineDetailData'
+
+    CopyOutlineData:
+      type: object
+      required: [outlineId, outlineType, copyContent, copyFormat]
+      properties:
+        outlineId:
+          type: string
+        outlineType:
+          $ref: '#/components/schemas/OutlineType'
+        copyContent:
+          type: string
+        copyFormat:
+          type: string
+          enum: [text, json, markdown]
+
+    CopyOutlineResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/CopyOutlineData'
+
+    StageProgress:
+      type: object
+      required:
+        [FILE_UPLOAD, TEXT_PREPROCESS, CHAPTER_OUTLINE, COARSE_OUTLINE, MAIN_OUTLINE, WORLD_OUTLINE]
+      properties:
+        FILE_UPLOAD:
+          type: integer
+        TEXT_PREPROCESS:
+          type: integer
+        CHAPTER_OUTLINE:
+          type: integer
+        COARSE_OUTLINE:
+          type: integer
+        MAIN_OUTLINE:
+          type: integer
+        WORLD_OUTLINE:
+          type: integer
+
+    TaskStatusData:
+      type: object
+      required:
+        [taskId, bookId, status, currentStage, stageProgress, totalChapters, completedChapters, errorCount, startTime]
+      properties:
+        taskId:
+          type: string
+        bookId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, RUNNING, COMPLETED, FAILED]
+        currentStage:
+          $ref: '#/components/schemas/ProcessingStage'
+        stageProgress:
+          $ref: '#/components/schemas/StageProgress'
+        totalChapters:
+          type: integer
+        completedChapters:
+          type: integer
+        errorCount:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          nullable: true
+          format: date-time
+        estimatedTimeRemaining:
+          type: integer
+          nullable: true
+          description: 预计剩余秒数
+
+    TaskStatusResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/TaskStatusData'
+
+    TaskErrorItem:
+      type: object
+      required: [errorId, stage, errorType, errorMessage, timestamp]
+      properties:
+        errorId:
+          type: string
+        stage:
+          $ref: '#/components/schemas/ProcessingStage'
+        chapterIndex:
+          type: integer
+          nullable: true
+        errorType:
+          type: string
+        errorMessage:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    TaskErrorsData:
+      type: object
+      required: [taskId, totalErrors, errors]
+      properties:
+        taskId:
+          type: string
+        totalErrors:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskErrorItem'
+
+    TaskErrorsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/TaskErrorsData'
+
+    WebSocketProgressPayload:
+      type: object
+      required: [taskId, stage, progress, total, completed, message]
+      properties:
+        taskId:
+          type: string
+        stage:
+          $ref: '#/components/schemas/ProcessingStage'
+        progress:
+          type: integer
+        total:
+          type: integer
+        completed:
+          type: integer
+        message:
+          type: string
+
+    WebSocketOutlineUpdatePayload:
+      type: object
+      required: [outlineId, outlineType, status, summary]
+      properties:
+        outlineId:
+          type: string
+        outlineType:
+          $ref: '#/components/schemas/OutlineType'
+        chapterIndex:
+          type: integer
+        status:
+          $ref: '#/components/schemas/OutlineStatus'
+        summary:
+          type: string
+
+    WebSocketErrorPayload:
+      type: object
+      required: [taskId, stage, errorType, errorMessage, willRetry]
+      properties:
+        taskId:
+          type: string
+        stage:
+          $ref: '#/components/schemas/ProcessingStage'
+        chapterIndex:
+          type: integer
+          nullable: true
+        errorType:
+          type: string
+        errorMessage:
+          type: string
+        willRetry:
+          type: boolean
+        retryAfter:
+          type: integer
+          nullable: true
+
+    WebSocketCompletedPayload:
+      type: object
+      required: [taskId, bookId, status, totalChapters, totalTime, worldOutlineId]
+      properties:
+        taskId:
+          type: string
+        bookId:
+          type: string
+        status:
+          type: string
+          enum: [COMPLETED]
+        totalChapters:
+          type: integer
+        totalTime:
+          type: integer
+          description: 总耗时，单位秒
+        worldOutlineId:
+          type: string
+
+    BookProcessingStatusData:
+      type: object
+      required: [bookId, status, stageProgress]
+      properties:
+        bookId:
+          type: string
+        status:
+          $ref: '#/components/schemas/BookStatus'
+        taskId:
+          type: string
+          nullable: true
+        currentStage:
+          allOf:
+            - $ref: '#/components/schemas/ProcessingStage'
+          nullable: true
+        stageProgress:
+          type: object
+          additionalProperties:
+            type: integer
+
+    BookProcessingStatusResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              const: true
+            data:
+              $ref: '#/components/schemas/BookProcessingStatusData'

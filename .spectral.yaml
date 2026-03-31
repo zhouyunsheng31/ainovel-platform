@@ -1,0 +1,27 @@
+extends: spectral:oas
+rules:
+  info-matches-version:
+    description: Info 必须包含版本号
+    severity: error
+    given: $.info
+    then:
+      - field: version
+        function: truthy
+  operation-operationId:
+    description: 每个操作必须有 operationId
+    severity: error
+    given: $.paths.*.*.operationId
+    then:
+      function: truthy
+  operation-summary:
+    description: 每个操作必须有 summary
+    severity: error
+    given: $.paths.*.*.summary
+    then:
+      function: truthy
+  response-schema:
+    description: 响应必须包含 schema
+    severity: warn
+    given: $.paths.*.*.responses.*.content.*.schema
+    then:
+      function: truthy

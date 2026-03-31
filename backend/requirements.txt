@@ -1,0 +1,33 @@
+# AI小说拆书系统 - Python依赖
+# Web框架
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+websockets>=12.0
+
+# 数据库
+sqlalchemy>=2.0.30
+aiosqlite>=0.20.0
+
+# LangChain生态 (兼容Python 3.14)
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langgraph>=0.2.0
+langsmith>=0.1.0
+
+# 文件处理
+chardet>=5.2.0
+ebooklib>=0.18
+python-docx>=1.1.0
+PyPDF2>=3.0.1
+
+# 工具
+pydantic>=2.10.0
+pydantic-settings>=2.5.0
+python-dotenv>=1.0.0
+aiofiles>=24.1.0
+httpx>=0.27.0
+tenacity>=8.2.3
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+

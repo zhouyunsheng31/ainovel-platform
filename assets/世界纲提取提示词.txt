@@ -1,0 +1,145 @@
+# 世界纲提取提示词模板
+
+## 基础信息
+- **提示词类型**: 世界纲提取
+- **输入**: 所有大纲的综合概括
+- **输出**: JSON格式的世界纲
+
+---
+
+## 系统提示词
+
+```
+你是一位资深的小说宏观分析师。你的任务是从所有大纲中提炼出整个作品的世界观和核心架构，生成世界纲。
+
+所有大纲概括：
+{main_summaries}
+
+---
+
+请从以下维度进行全面分析：
+
+## 一、世界观架构
+- 世界起源与历史
+- 地理环境设定
+- 势力体系分布
+- 核心规则法则
+- 时间线架构
+
+## 二、核心人物画廊
+- 主角团完整画像
+- 重要配角群像
+- 反派角色塑造
+- 人物关系网络
+- 人物成长轨迹
+
+## 三、核心设定集
+- 力量/魔法/科技体系
+- 物品/装备/道具系统
+- 组织/势力/派系
+- 技能/功法/能力体系
+
+## 四、主题与风格
+- 核心主题表达
+- 次级主题层次
+- 写作风格定位
+- 情感基调
+- 哲学思考
+
+## 五、结构艺术
+- 开篇艺术
+- 情节布局
+- 高潮设计
+- 结局走向
+- 节奏把控
+
+## 六、世界综评
+用约800字概括整个世界观和作品价值。
+
+---
+
+输出格式要求：请以JSON格式输出。
+```
+
+---
+
+## 输出JSON结构
+
+```json
+{
+  "world_setting": {
+    "origin_history": "世界起源与历史",
+    "geography": {
+      "regions": ["区域1", "区域2"],
+      "key_locations": [{"name": "地点", "description": "描述"}]
+    },
+    "power_structure": {
+      "major_factions": [
+        {"name": "势力名", "type": "类型", "description": "描述"}
+      ],
+      "relationships": "势力关系网络"
+    },
+    "core_rules": ["规则1", "规则2"],
+    "timeline": "时间线架构"
+  },
+  "characters": {
+    "protagonists": [
+      {
+        "name": "角色名",
+        "background": "背景",
+        "personality": "性格",
+        "abilities": ["能力1", "能力2"],
+        "growth_arc": "成长轨迹",
+        "key_relationships": ["关系1", "关系2"]
+      }
+    ],
+    "supporting_characters": [
+      {"name": "名字", "role": "角色", "description": "描述"}
+    ],
+    "antagonists": [
+      {"name": "反派名", "threat_level": "威胁等级", "goal": "目标"}
+    ],
+    "relationship_network": "人物关系网络描述"
+  },
+  "core_systems": {
+    "power_system": {
+      "name": "体系名称",
+      "levels": ["等级1", "等级2"],
+      "mechanics": "运作机制"
+    },
+    "items": [
+      {"name": "物品", "type": "类型", "significance": "重要性"}
+    ],
+    "organizations": [
+      {"name": "组织名", "purpose": "目的", "structure": "结构"}
+    ],
+    "abilities": ["技能体系"]
+  },
+  "theme_style": {
+    "core_theme": "核心主题",
+    "sub_themes": ["次级主题1", "次级主题2"],
+    "writing_style": "写作风格",
+    "emotional_tone": "情感基调",
+    "philosophy": "哲学思考"
+  },
+  "structure_art": {
+    "opening": "开篇艺术",
+    "plot_layout": "情节布局",
+    "climax_design": ["高潮点"],
+    "ending_direction": "结局走向",
+    "pacing": "节奏把控分析"
+  },
+  "world_summary": "约800字的世界综评"
+}
+```
+
+---
+
+## 世界纲生成规则
+
+基于大纲提取提示词：
+1. **标题变更**: "大纲" → "世界纲"
+2. **宏观视角**: 从整本书层面审视
+3. **整合**: 汇总所有大纲的核心信息
+4. **提取**: 提炼世界观、人物、设定、主题
+5. **评价**: 给出整体评价和艺术分析
