@@ -4,7 +4,7 @@ AI小说拆书系统 - Pydantic数据模型（API请求/响应）
 """
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -61,7 +61,7 @@ class OutlineStatusEnum(str, Enum):
 class APIResponse(BaseModel):
     """通用API响应包装"""
     success: bool = True
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
 
 
 class ErrorResponse(APIResponse):
