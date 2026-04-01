@@ -9,9 +9,9 @@ class Settings(BaseSettings):
     """应用配置"""
     
     # API配置
-    api_base_url: str = "https://api.n1n.ai/v1"
-    api_key: str = "<YOUR_API_KEY>"
-    model_name: str = "gpt-5.4-nano"
+    api_base_url: str = "https://coding.st0722.top/v1"
+    api_key: str = "sk-ivQlyYxtR5Q9Yiqyfzs5BPzWNqtlLd0sRrjp2KtVaG3Dhv6y"
+    model_name: str = "Qwen3.5-Plus"
     
     # LLM参数
     temperature: float = 0.7
