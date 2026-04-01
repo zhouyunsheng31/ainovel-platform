@@ -10,9 +10,9 @@ python mock_server.py &
 MOCK_PID=$!
 sleep 2
 
-echo "[2/2] 启动前端静态服务 (端口 8080)..."
+echo "[2/2] 启动前端静态服务 (端口 8081)..."
 cd ..
-python -m http.server 8080 &
+python -m http.server 8081 &
 FRONTEND_PID=$!
 
 echo ""
@@ -20,7 +20,7 @@ echo "========================================"
 echo "服务已启动:"
 echo "- Mock API: http://localhost:3001"
 echo "- Mock API文档: http://localhost:3001/docs"
-echo "- 前端页面: http://localhost:8080"
+echo "- 前端页面: http://localhost:8081"
 echo "========================================"
 echo ""
 echo "按 Ctrl+C 停止所有服务"
