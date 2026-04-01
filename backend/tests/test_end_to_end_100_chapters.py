@@ -172,16 +172,32 @@ async def test_complete_workflow_100_chapters():
             
             # 5. 复制纲功能测试
             print("\n[7/7] 测试复制纲功能...")
-            formats_to_test = ['markdown', 'json', 'text']
-            for fmt in formats_to_test:
-                try:
-                    response = await client.get(f'/api/v1/books/{book_id}/outlines/copy', params={'format': fmt})
-                    if response.status_code == 200:
-                        copy_result = response.json()['data']
-                        print(f"  ✓ {fmt.upper()}格式复制成功")
-                        print(f"    长度: {len(copy_result.get('content', ''))}字符")
-                except Exception as e:
-                    print(f"  ✗ {fmt.upper()}格式复制失败: {e}")
+            # 从纲树中获取一个outlineId进行复制测试
+            if 'children' in tree_data['tree'] and tree_data['tree']['children']:
+                # 获取第一个大纲的outlineId
+                first_main = tree_data['tree']['children'][0]
+                outline_id_to_copy = first_main.get('outlineId', '')
+                
+                if outline_id_to_copy:
+                    formats_to_test = ['markdown', 'json', 'text']
+                    for fmt in formats_to_test:
+                        try:
+                            response = await client.post(
+                                f'/api/v1/outlines/{outline_id_to_copy}/copy',
+                                params={'format': fmt}
+                            )
+                            if response.status_code == 200:
+                                copy_result = response.json()['data']
+                                print(f"  ✓ {fmt.upper()}格式复制成功")
+                                print(f"    长度: {len(copy_result.get('copyContent', ''))}字符")
+                            else:
+                                print(f"  ✗ {fmt.upper()}格式复制失败: {response.status_code}")
+                        except Exception as e:
+                            print(f"  ✗ {fmt.upper()}格式复制失败: {e}")
+                else:
+                    print("  跳过复制测试: 未找到有效的outlineId")
+            else:
+                print("  跳过复制测试: 纲树为空")
             
             # 总结
             print("\n" + "=" * 90)

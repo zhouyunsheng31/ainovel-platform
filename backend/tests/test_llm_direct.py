@@ -21,9 +21,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 class Settings(BaseSettings):
     """临时配置类"""
-    api_base_url: str = "https://coding.st0722.top"
+    api_base_url: str = "https://coding.st0722.top/v1"
     api_key: str = "sk-ivQlyYxtR5Q9Yiqyfzs5BPzWNqtlLd0sRrjp2KtVaG3Dhv6y"
-    model_name: str = "Qwen3.5-Plus"
+    model_name: str = "Kimi-K2.5"
     temperature: float = 0.7
     max_tokens: int = 4096
     llm_timeout: int = 60

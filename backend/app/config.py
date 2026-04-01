@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # API配置
     api_base_url: str = "https://coding.st0722.top/v1"
     api_key: str = "sk-ivQlyYxtR5Q9Yiqyfzs5BPzWNqtlLd0sRrjp2KtVaG3Dhv6y"
-    model_name: str = "Qwen3.5-Plus"
+    model_name: str = "Kimi-K2.5"
     
     # LLM参数
     temperature: float = 0.7

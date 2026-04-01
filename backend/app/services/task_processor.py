@@ -229,6 +229,24 @@ class TaskProcessor:
         main_ids = []
         world_id = None
 
+        # 1. 先保存世界纲（根节点）
+        wo = result.get("world_outline", {})
+        if wo.get("status") == "COMPLETED":
+            wid = f"world_{book_id}"
+            outline = Outline(
+                outline_id=wid,
+                book_id=book_id,
+                outline_type="WORLD",
+                outline_index=0,
+                content_json=wo.get("content", {}),
+                summary=wo.get("summary", ""),
+                status="COMPLETED"
+            )
+            db.add(outline)
+            world_id = wid
+            await db.flush()
+
+        # 2. 保存章纲
         for co in result.get("chapter_outlines", []):
             if co.get("status") == "COMPLETED":
                 oid = f"chapter_{book_id}_{co['index']}"
@@ -247,6 +265,26 @@ class TaskProcessor:
 
         await db.flush()
 
+        # 3. 保存大纲（父节点是世界纲）
+        for mo in result.get("main_outlines", []):
+            if mo.get("status") == "COMPLETED":
+                oid = f"main_{book_id}_{mo['index']}"
+                outline = Outline(
+                    outline_id=oid,
+                    book_id=book_id,
+                    outline_type="MAIN",
+                    outline_index=mo["index"],
+                    content_json=mo.get("content", {}),
+                    summary=mo.get("summary", ""),
+                    parent_outline_id=world_id,
+                    status="COMPLETED"
+                )
+                db.add(outline)
+                main_ids.append(oid)
+
+        await db.flush()
+
+        # 4. 保存粗纲（父节点是大纲）
         for co in result.get("coarse_outlines", []):
             if co.get("status") == "COMPLETED":
                 oid = f"coarse_{book_id}_{co['index']}"
@@ -275,59 +313,22 @@ class TaskProcessor:
 
         await db.flush()
 
-        for mo in result.get("main_outlines", []):
-            if mo.get("status") == "COMPLETED":
-                oid = f"main_{book_id}_{mo['index']}"
-                parent = world_id
-                outline = Outline(
-                    outline_id=oid,
-                    book_id=book_id,
-                    outline_type="MAIN",
-                    outline_index=mo["index"],
-                    content_json=mo.get("content", {}),
-                    summary=mo.get("summary", ""),
-                    parent_outline_id=parent,
-                    status="COMPLETED"
-                )
-                db.add(outline)
-                main_ids.append(oid)
-
-        await db.flush()
-
-        if main_ids:
-            for cid in coarse_ids.values():
-                result_obj = await db.execute(
-                    select(Outline).where(Outline.outline_id == cid)
-                )
-                coarse_obj = result_obj.scalar_one_or_none()
-                if coarse_obj and not coarse_obj.parent_outline_id:
-                    coarse_obj.parent_outline_id = main_ids[0]
-
-        wo = result.get("world_outline", {})
-        if wo.get("status") == "COMPLETED":
-            wid = f"world_{book_id}"
-            outline = Outline(
-                outline_id=wid,
-                book_id=book_id,
-                outline_type="WORLD",
-                outline_index=0,
-                content_json=wo.get("content", {}),
-                summary=wo.get("summary", ""),
-                status="COMPLETED"
-            )
-            db.add(outline)
-            world_id = wid
-
-        await db.flush()
-
-        if world_id:
-            for mid in main_ids:
-                result_obj = await db.execute(
-                    select(Outline).where(Outline.outline_id == mid)
-                )
-                main_obj = result_obj.scalar_one_or_none()
-                if main_obj:
-                    main_obj.parent_outline_id = world_id
+        # 5. 更新章纲的父节点（关联到粗纲）
+        for coarse_idx, coarse_id in coarse_ids.items():
+            coarse_outline = result.get("coarse_outlines", [])
+            for co in coarse_outline:
+                if co.get("index") == coarse_idx and co.get("status") == "COMPLETED":
+                    range_start = co.get("chapter_range", [0, 0])[0]
+                    range_end = co.get("chapter_range", [0, 0])[1]
+                    for ch_idx in range(range_start, range_end + 1):
+                        if ch_idx in chapter_ids:
+                            ch_result = await db.execute(
+                                select(Outline).where(Outline.outline_id == chapter_ids[ch_idx])
+                            )
+                            ch_obj = ch_result.scalar_one_or_none()
+                            if ch_obj:
+                                ch_obj.parent_outline_id = coarse_id
+                    break
 
         await db.commit()
 
