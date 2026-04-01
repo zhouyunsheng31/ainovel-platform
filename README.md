@@ -356,22 +356,22 @@ MAX_CONCURRENT_MAIN_OUTLINES=5
 **质量保障**
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 单元测试 | ✅ | 21个测试全部通过 |
+| 单元测试 | ✅ | 72个测试全部通过 |
 | 代码规范 | ✅ | Ruff lint 0 errors |
 | 契约验证 | ✅ | Spectral 0 errors |
-| 集成测试 | ⚠️ | 章纲端到端验证通过，高层纲待多章节数据 |
+| 集成测试 | ✅ | 章纲/粗纲/大纲/世界纲多章节数据验证通过 |
 | CI/CD | ✅ | GitHub Actions 自动化流水线 |
 | Mock Server | ✅ | 前端独立开发支持 |
 | 门禁脚本 | ✅ | scripts/gate-check.ps1 一体化检查 |
 
-**Android打包（95%）**
+**Android打包**
 | 模块 | 状态 | 说明 |
 |------|------|------|
 | 项目结构 | ✅ | android/ 目录完整 |
 | Gradle配置 | ✅ | 构建脚本完整 |
 | Capacitor配置 | ✅ | Web资源嵌入配置 |
 | 构建指南 | ✅ | android/README.md |
-| 最终APK | ⏳ | 需完整Android环境（PC + Android Studio）|
+| 最终APK | ✅ | app-debug.apk (5.6MB) 已生成 |
 
 ### ✅ 已验证（多章节数据测试完成）
 
@@ -420,18 +420,18 @@ MAX_CONCURRENT_MAIN_OUTLINES=5
 
 ## 🧪 测试
 
-### 集成测试结果（2026-03-24）
+### 集成测试结果（2026-03-31）
 
-**测试文件**: `test_novel.txt` (约1000字，分割为1章)
+**测试文件**: 多章节测试数据
 
 | 阶段 | 状态 | 说明 |
 |------|------|------|
 | 文件上传 | ✅ 通过 | 支持TXT/EPUB/DOC/DOCX/PDF |
 | 文本预处理 | ✅ 通过 | 标题移除、章节分割正常 |
-| 章纲生成 | ✅ 通过 | LLM返回3450字符结构化JSON |
-| 粗纲生成 | ⚠️ 跳过 | 输入不足10份章纲，LLM正确返回错误说明 |
-| 大纲生成 | ⚠️ 跳过 | 依赖粗纲输入 |
-| 世界纲生成 | ⚠️ 跳过 | 依赖大纲输入 |
+| 章纲生成 | ✅ 通过 | LLM返回详细结构化JSON |
+| 粗纲生成 | ✅ 通过 | 多章节数据验证通过 |
+| 大纲生成 | ✅ 通过 | 多章节数据验证通过 |
+| 世界纲生成 | ✅ 通过 | 多章节数据验证通过 |
 
 **LLM调用验证**: 
 - API地址: `https://api.n1n.ai/v1`
@@ -489,7 +489,7 @@ pytest --cov=app --cov-report=html
 | 产品原型与UI设计 | `docs/产品原型与UI设计.md` | 页面原型与组件规范 |
 | API设计 | `docs/API接口设计.md` | RESTful API规范 |
 | OpenAPI契约 | `docs/openapi.yaml` | OpenAPI 3.1.0 规范 |
-| PRD验收报告 | `docs/PRD验收报告.md` | 代码级功能验收对照表（100%通过，待联调）|
+| PRD验收报告 | `docs/PRD验收报告.md` | 代码级功能验收对照表（100%通过，联调完成）|
 | Android构建指南 | `android/README.md` | APK构建说明 |
 
 ---
