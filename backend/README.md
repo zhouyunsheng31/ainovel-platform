@@ -154,9 +154,9 @@ python main.py
 - [x] 四层纲生成服务（outline_service.py 已完成）
 - [x] WebSocket实时推送（websocket.py 已完成）
 - [x] 门禁命令标准化（gate-check.ps1 已完成）
-- [ ] 密钥清理与轮换（P0）
-- [ ] 工作流循环依赖解耦（P2）
-- [ ] 工作流测试纳入pytest（P2）
+- [x] 密钥清理与轮换（P0 已完成）
+- [x] 工作流循环依赖解耦（P2 已完成）
+- [x] 工作流测试纳入pytest（P2 已完成）
 - [ ] 集成LangSmith监控（P5）
 - [ ] 添加任务队列（Celery/RQ）
 - [ ] 实现断点续传
