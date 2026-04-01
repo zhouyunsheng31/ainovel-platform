@@ -72,7 +72,7 @@ async def test_complete_workflow_100_chapters():
                     'author': '会说话的肘子'
                 }
                 
-                response = await client.post('/books/upload', files=files, data=data)
+                response = await client.post('/api/v1/books/upload', files=files, data=data)
             
             if response.status_code != 200:
                 print(f"✗ 上传失败: {response.status_code}")
@@ -80,8 +80,8 @@ async def test_complete_workflow_100_chapters():
                 return
             
             upload_result = response.json()
-            book_id = upload_result['data']['book_id']
-            task_id = upload_result['data']['task_id']
+            book_id = upload_result['data']['bookId']
+            task_id = upload_result['data']['taskId']
             
             upload_time = time.time() - start_upload
             print(f"✓ 上传成功")
@@ -102,7 +102,7 @@ async def test_complete_workflow_100_chapters():
                 await asyncio.sleep(poll_interval)
                 
                 try:
-                    response = await client.get(f'/books/{book_id}/status')
+                    response = await client.get(f'/api/v1/books/{book_id}/status')
                     if response.status_code == 200:
                         status_data = response.json()['data']
                         current_status = status_data.get('status', '')
@@ -127,17 +127,17 @@ async def test_complete_workflow_100_chapters():
             
             # 3. 获取书籍详情
             print("\n[5/7] 获取书籍详情...")
-            response = await client.get(f'/books/{book_id}')
+            response = await client.get(f'/api/v1/books/{book_id}')
             if response.status_code == 200:
                 book_detail = response.json()['data']
                 print(f"✓ 书籍详情获取成功")
                 print(f"  标题: {book_detail['title']}")
-                print(f"  总章节: {book_detail.get('total_chapters', 0)}章")
+                print(f"  总章节: {book_detail.get('totalChapters', 0)}章")
                 print(f"  状态: {book_detail['status']}")
             
             # 4. 获取纲树（多层级图表）
             print("\n[6/7] 获取纲树（多层级图表）...")
-            response = await client.get(f'/books/{book_id}/outlines/tree')
+            response = await client.get(f'/api/v1/books/{book_id}/tree')
             if response.status_code == 200:
                 tree_data = response.json()['data']
                 print(f"✓ 纲树获取成功")
@@ -175,7 +175,7 @@ async def test_complete_workflow_100_chapters():
             formats_to_test = ['markdown', 'json', 'text']
             for fmt in formats_to_test:
                 try:
-                    response = await client.get(f'/books/{book_id}/outlines/copy', params={'format': fmt})
+                    response = await client.get(f'/api/v1/books/{book_id}/outlines/copy', params={'format': fmt})
                     if response.status_code == 200:
                         copy_result = response.json()['data']
                         print(f"  ✓ {fmt.upper()}格式复制成功")
@@ -218,10 +218,6 @@ if __name__ == "__main__":
     print("  cd backend && python tests/test_end_to_end_100_chapters.py")
     print("\n" + "=" * 90 + "\n")
     
-    # 先不直接运行，因为需要后端服务启动
-    print("请确认后端服务已启动，然后按Enter继续...")
-    try:
-        input()
-        asyncio.run(test_complete_workflow_100_chapters())
-    except KeyboardInterrupt:
-        print("\n测试已取消")
+    # 直接运行测试，假设后端服务已启动
+    print("开始运行端到端测试...")
+    asyncio.run(test_complete_workflow_100_chapters())
