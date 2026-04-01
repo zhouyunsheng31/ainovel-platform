@@ -2,94 +2,310 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-    <meta name="description" content="AI小说拆书系统">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI小说拆书系统 - 智能解析小说结构，生成四层纲体系">
     <meta name="theme-color" content="#6366f1">
     <title>AI小说拆书系统</title>
+    
+    <!-- 样式文件 -->
     <link rel="stylesheet" href="css/styles.css">
-    <style>.icon{display:inline-block;width:1em;height:1em;vertical-align:-0.125em;fill:currentColor}.icon-2x{font-size:1.5em}</style>
+    
+    <!-- 字体图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- 应用容器 -->
     <div id="app" class="app-container">
+        <!-- 头部导航 -->
         <header class="app-header">
             <div class="header-content">
                 <div class="logo">
-                    <svg class="icon icon-2x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+                    <i class="fas fa-book-open"></i>
                     <span>AI小说拆书系统</span>
                 </div>
                 <nav class="nav-links">
-                    <a href="#" class="nav-link active" data-page="upload"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>上传</a>
-                    <a href="#" class="nav-link" data-page="library"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>书库</a>
-                    <a href="#" class="nav-link" data-page="settings"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.991l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.127.332-.183.582-.495.644-.869l.214-1.28z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>设置</a>
+                    <a href="#" class="nav-link active" data-page="upload">
+                        <i class="fas fa-upload"></i>
+                        上传
+                    </a>
+                    <a href="#" class="nav-link" data-page="library">
+                        <i class="fas fa-book"></i>
+                        书库
+                    </a>
+                    <a href="#" class="nav-link" data-page="settings">
+                        <i class="fas fa-cog"></i>
+                        设置
+                    </a>
                 </nav>
                 <div class="header-actions">
-                    <button class="btn-icon" id="themeToggle" title="切换主题"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.334.266-2.597.748-3.752A9.753 9.753 0 0112 2.25c5.385 0 9.75 4.365 9.75 9.75 0 1.334-.266 2.597-.748 3.752a9.71 9.71 0 01-3.002 4.25z"/></svg></button>
+                    <button class="btn-icon" id="themeToggle" title="切换主题">
+                        <i class="fas fa-moon"></i>
+                    </button>
                 </div>
             </div>
         </header>
+
+        <!-- 主内容区 -->
         <main class="main-content">
+            <!-- 上传页面 -->
             <section id="page-upload" class="page active">
-                <div class="page-header"><h1>上传小说文件</h1><p class="page-desc">支持 epub、txt、word、pdf 格式</p></div>
+                <div class="page-header">
+                    <h1>上传小说文件</h1>
+                    <p class="page-desc">支持 epub、txt、word、pdf 格式，系统将自动解析并生成四层纲结构</p>
+                </div>
+                
                 <div class="upload-section">
+                    <!-- 文件上传组件容器 -->
                     <div id="fileUploader"></div>
+                    
+                    <!-- 书籍信息表单 -->
                     <div class="book-info-form hidden" id="bookInfoForm">
                         <h3>书籍信息</h3>
                         <div class="form-grid">
-                            <div class="form-group"><label for="bookTitle">书名</label><input type="text" id="bookTitle" class="form-input" placeholder="输入书名"></div>
-                            <div class="form-group"><label for="bookAuthor">作者</label><input type="text" id="bookAuthor" class="form-input" placeholder="输入作者"></div>
-                            <div class="form-group full-width"><label for="bookDescription">简介</label><textarea id="bookDescription" class="form-input" rows="3" placeholder="书籍简介"></textarea></div>
+                            <div class="form-group">
+                                <label for="bookTitle">书名</label>
+                                <input type="text" id="bookTitle" class="form-input" placeholder="输入书名">
+                            </div>
+                            <div class="form-group">
+                                <label for="bookAuthor">作者</label>
+                                <input type="text" id="bookAuthor" class="form-input" placeholder="输入作者">
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="bookDescription">简介</label>
+                                <textarea id="bookDescription" class="form-input" rows="3" placeholder="书籍简介（可选）"></textarea>
+                            </div>
                         </div>
                         <div class="form-actions">
-                            <button class="btn btn-secondary" id="btnReset">重新选择</button>
-                            <button class="btn btn-primary" id="btnStartProcess">开始处理</button>
+                            <button class="btn btn-secondary" id="btnReset">
+                                <i class="fas fa-redo"></i> 重新选择
+                            </button>
+                            <button class="btn btn-primary" id="btnStartProcess">
+                                <i class="fas fa-play"></i> 开始处理
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="progress-section hidden" id="progressSection"><h2>处理进度</h2><div id="progressMonitor"></div></div>
-            </section>
-            <section id="page-library" class="page">
-                <div class="page-header"><h1>我的书库</h1><p class="page-desc">查看已处理的书籍</p></div>
-                <div class="library-toolbar">
-                    <div class="search-box"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg><input type="text" id="searchInput" placeholder="搜索书籍..."></div>
-                    <div class="filter-group"><select id="statusFilter" class="form-select"><option value="">全部状态</option><option value="completed">已完成</option><option value="processing">处理中</option></select></div>
+                
+                <!-- 处理进度监控 -->
+                <div class="progress-section hidden" id="progressSection">
+                    <h2>处理进度</h2>
+                    <div id="progressMonitor"></div>
                 </div>
-                <div class="book-grid" id="bookGrid"><div class="empty-state"><svg class="icon icon-2x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25v14.25"/></svg><p>暂无书籍</p></div></div>
             </section>
+
+            <!-- 书库页面 -->
+            <section id="page-library" class="page">
+                <div class="page-header">
+                    <h1>我的书库</h1>
+                    <p class="page-desc">查看已处理的书籍及其纲结构</p>
+                </div>
+                
+                <div class="library-toolbar">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchInput" placeholder="搜索书籍...">
+                    </div>
+                    <div class="filter-group">
+                        <select id="statusFilter" class="form-select">
+                            <option value="">全部状态</option>
+                            <option value="completed">已完成</option>
+                            <option value="processing">处理中</option>
+                            <option value="failed">失败</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="book-grid" id="bookGrid">
+                    <!-- 书籍卡片将由JS动态生成 -->
+                    <div class="empty-state">
+                        <i class="fas fa-book"></i>
+                        <p>暂无书籍，快去上传吧！</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 书籍详情页面 -->
             <section id="page-detail" class="page">
-                <div class="detail-header"><button class="btn btn-ghost" id="btnBackToLibrary">返回书库</button><div class="book-meta" id="bookMeta"></div></div>
+                <div class="detail-header">
+                    <button class="btn btn-ghost" id="btnBackToLibrary">
+                        <i class="fas fa-arrow-left"></i> 返回书库
+                    </button>
+                    <div class="book-meta" id="bookMeta"></div>
+                </div>
+                
+                <div class="outline-container">
+                    <div class="outline-tabs">
+                        <button class="tab-btn active" data-tab="tree">
+                            <i class="fas fa-sitemap"></i> 树形视图
+                        </button>
+                        <button class="tab-btn" data-tab="list">
+                            <i class="fas fa-list"></i> 列表视图
+                        </button>
+                        <button class="tab-btn" data-tab="export">
+                            <i class="fas fa-download"></i> 导出
+                        </button>
+                    </div>
+                    
+                    <div class="tab-content active" id="tab-tree">
+                        <div class="tree-container" id="outlineTree">
+                            <!-- 树形图将由JS生成 -->
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-list">
+                        <div class="list-container" id="outlineList">
+                            <!-- 列表视图将由JS生成 -->
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-export">
+                        <div class="export-options">
+                            <h3>导出选项</h3>
+                            <div class="export-formats">
+                                <label class="format-option">
+                                    <input type="radio" name="exportFormat" value="json" checked>
+                                    <span class="format-label">
+                                        <i class="fas fa-code"></i>
+                                        JSON
+                                    </span>
+                                </label>
+                                <label class="format-option">
+                                    <input type="radio" name="exportFormat" value="markdown">
+                                    <span class="format-label">
+                                        <i class="fab fa-markdown"></i>
+                                        Markdown
+                                    </span>
+                                </label>
+                                <label class="format-option">
+                                    <input type="radio" name="exportFormat" value="txt">
+                                    <span class="format-label">
+                                        <i class="fas fa-file-alt"></i>
+                                        纯文本
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="export-levels">
+                                <h4>导出层级</h4>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="exportLevel" value="chapter" checked>
+                                    章纲
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="exportLevel" value="coarse" checked>
+                                    粗纲
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="exportLevel" value="rough" checked>
+                                    大纲
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="exportLevel" value="world" checked>
+                                    世界纲
+                                </label>
+                            </div>
+                            <button class="btn btn-primary" id="btnExport">
+                                <i class="fas fa-download"></i> 导出
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </section>
+
+            <!-- 设置页面 -->
             <section id="page-settings" class="page">
-                <div class="page-header"><h1>系统设置</h1><p class="page-desc">配置参数</p></div>
+                <div class="page-header">
+                    <h1>系统设置</h1>
+                    <p class="page-desc">配置API、模型参数和处理选项</p>
+                </div>
+                
                 <div class="settings-container">
                     <div class="settings-section">
-                        <h3>API 配置</h3>
-                        <div class="form-group"><label for="apiBaseUrl">API Base URL</label><input type="text" id="apiBaseUrl" class="form-input" value="http://localhost:8000/api/v1"></div>
-                        <div class="form-group"><label for="apiKey">API Key</label><input type="password" id="apiKey" class="form-input" placeholder="输入API密钥"></div>
+                        <h3><i class="fas fa-key"></i> API 配置</h3>
+                        <div class="form-group">
+                            <label for="apiBaseUrl">API Base URL</label>
+                            <input type="text" id="apiBaseUrl" class="form-input" value="http://localhost:8000/api/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="apiKey">API Key</label>
+                            <div class="input-group">
+                                <input type="password" id="apiKey" class="form-input" value="" placeholder="输入API密钥">
+                                <button class="btn btn-icon-only" id="toggleApiKey" type="button">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
+                    
                     <div class="settings-section">
-                        <h3>模型配置</h3>
-                        <div class="form-group"><label for="modelName">模型名称</label><input type="text" id="modelName" class="form-input" value="gpt-5.4-nano"></div>
-                        <div class="form-group"><label for="temperature">Temperature</label><div class="range-input"><input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7"><span class="range-value" id="temperatureValue">0.7</span></div></div>
-                        <div class="form-group"><label for="maxTokens">Max Tokens</label><input type="number" id="maxTokens" class="form-input" value="4096"></div>
+                        <h3><i class="fas fa-robot"></i> 模型配置</h3>
+                        <div class="form-group">
+                            <label for="modelName">模型名称</label>
+                            <input type="text" id="modelName" class="form-input" value="gpt-5.4-nano">
+                        </div>
+                        <div class="form-group">
+                            <label for="temperature">Temperature</label>
+                            <div class="range-input">
+                                <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                                <span class="range-value" id="temperatureValue">0.7</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="maxTokens">Max Tokens</label>
+                            <input type="number" id="maxTokens" class="form-input" value="4096">
+                        </div>
                     </div>
+                    
                     <div class="settings-section">
-                        <h3>分割设置</h3>
-                        <div class="form-group"><label for="chapterSize">章节字数</label><input type="number" id="chapterSize" class="form-input" value="2000"></div>
+                        <h3><i class="fas fa-cut"></i> 分割设置</h3>
+                        <div class="form-group">
+                            <label for="chapterSize">章节字数限制</label>
+                            <input type="number" id="chapterSize" class="form-input" value="2000">
+                            <span class="form-hint">建议范围：1500-3000字</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="keepParagraphComplete" checked>
+                                保持段落完整性
+                            </label>
+                        </div>
                     </div>
+                    
                     <div class="settings-section">
-                        <h3>开发选项</h3>
-                        <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="mockMode" checked>启用 Mock 模式</label></div>
+                        <h3><i class="fas fa-flask"></i> 开发选项</h3>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="mockMode">
+                                启用 Mock 模式（无后端测试）
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="debugMode">
+                                启用调试日志
+                            </label>
+                        </div>
                     </div>
+                    
                     <div class="settings-actions">
-                        <button class="btn btn-secondary" id="btnResetSettings">恢复默认</button>
-                        <button class="btn btn-primary" id="btnSaveSettings">保存设置</button>
+                        <button class="btn btn-secondary" id="btnResetSettings">
+                            <i class="fas fa-undo"></i> 恢复默认
+                        </button>
+                        <button class="btn btn-primary" id="btnSaveSettings">
+                            <i class="fas fa-save"></i> 保存设置
+                        </button>
                     </div>
                 </div>
             </section>
         </main>
+
+        <!-- Toast容器 -->
         <div id="toast-container" class="toast-container"></div>
+        
+        <!-- 模态框容器 -->
         <div id="modalContainer"></div>
     </div>
-    <script src="js/bundle.js"></script>
+
+    <!-- JavaScript 模块 -->
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>
