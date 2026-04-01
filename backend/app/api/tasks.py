@@ -6,7 +6,7 @@ GET /api/v1/tasks/{taskId}/errors - 获取任务错误日志
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models.database import get_session
 from ..models.models import ProcessingTask, ErrorLog
@@ -151,7 +151,7 @@ def _estimate_time_remaining(task: ProcessingTask) -> int:
     if total_progress == 0:
         return None
     
-    elapsed = (datetime.utcnow() - task.start_time).total_seconds()
+    elapsed = (datetime.now(timezone.utc) - task.start_time).total_seconds()
     estimated_total = elapsed / total_progress
     remaining = estimated_total - elapsed
     

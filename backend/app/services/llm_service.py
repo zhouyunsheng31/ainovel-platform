@@ -7,7 +7,7 @@ import re
 import json
 import asyncio
 import traceback
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable, Awaitable
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from langchain_openai import ChatOpenAI
@@ -164,9 +164,13 @@ class LLMService:
     async def batch_invoke(
         self,
         inputs: List[Dict[str, str]],
-        max_concurrency: int = 10
+        max_concurrency: int = 10,
+        on_item_complete: Optional[Callable[[int, Any], Awaitable[None]]] = None
     ) -> List[Dict[str, Any]]:
-        """批量并行调用LLM。"""
+        """
+        批量并行调用LLM。
+        on_item_complete: 每完成一项时回调 (index, result)
+        """
         logger.info("开始批量调用LLM", extra={
             "model_name": self.model_name,
             "batch_size": len(inputs),
@@ -174,6 +178,7 @@ class LLMService:
         })
         
         semaphore = asyncio.Semaphore(max_concurrency)
+        results: List[Any] = [None] * len(inputs)
 
         async def invoke_with_semaphore(input_data: Dict, index: int):
             async with semaphore:
@@ -190,6 +195,9 @@ class LLMService:
                         "model_name": self.model_name,
                         "batch_index": index
                     })
+                    results[index] = result
+                    if on_item_complete:
+                        await on_item_complete(index, result)
                     return result
                 except Exception as e:
                     error_code = ErrorCodes.LLM_API_ERROR
@@ -201,10 +209,14 @@ class LLMService:
                         "error_message": error_message,
                         "stack_trace": traceback.format_exc()
                     })
-                    return {"error": error_message, "error_code": error_code}
+                    err_result = {"error": error_message, "error_code": error_code}
+                    results[index] = err_result
+                    if on_item_complete:
+                        await on_item_complete(index, err_result)
+                    return err_result
 
         tasks = [invoke_with_semaphore(inp, i) for i, inp in enumerate(inputs)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions=True)
         
         # 统计成功和失败的数量
         success_count = sum(1 for r in results if not isinstance(r, Exception) and "error" not in r)

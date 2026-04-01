@@ -193,15 +193,22 @@ class StateManager {
    * 通知订阅者
    */
   notify(path) {
-    if (this.listeners.has(path)) {
-      const value = this.getState(path);
-      this.listeners.get(path).forEach(callback => {
-        try {
-          callback(value);
-        } catch (e) {
-          console.error('State listener error:', e);
-        }
-      });
+    const parts = path.split('.');
+    const pathsToNotify = [];
+    for (let i = parts.length; i >= 1; i--) {
+      pathsToNotify.push(parts.slice(0, i).join('.'));
+    }
+    for (const notifyPath of pathsToNotify) {
+      if (this.listeners.has(notifyPath)) {
+        const value = this.getState(notifyPath);
+        this.listeners.get(notifyPath).forEach(callback => {
+          try {
+            callback(value);
+          } catch (e) {
+            console.error('State listener error:', e);
+          }
+        });
+      }
     }
   }
   

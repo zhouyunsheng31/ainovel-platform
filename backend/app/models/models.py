@@ -4,7 +4,7 @@ AI小说拆书系统 - ORM数据模型
 """
 from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import enum
 
@@ -55,11 +55,12 @@ class Book(Base):
     file_type = Column(String(10), nullable=False)  # TXT/EPUB/DOC/DOCX/PDF
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer, nullable=False)
+    file_hash = Column(String(64), nullable=True)
     encoding = Column(String(20))  # UTF-8/GBK/GB2312
     total_chapters = Column(Integer, default=0)
     status = Column(String(20), default="IDLE")  # ProcessingStatus
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # 关系
     chapters = relationship("Chapter", back_populates="book", cascade="all, delete-orphan")
@@ -77,10 +78,10 @@ class ProcessingTask(Base):
     stage_progress = Column(JSON, default=dict)  # {"UPLOADING": 100, "EXTRACTING": 45, ...}
     total_chapters = Column(Integer, default=0)
     completed_chapters = Column(Integer, default=0)
-    status = Column(String(20), default="PENDING")  # PENDING/RUNNING/COMPLETED/FAILED
+    status = Column(String(20), default="PENDING")
     start_time = Column(DateTime)
     end_time = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # 关系
     book = relationship("Book", back_populates="task")
@@ -99,7 +100,7 @@ class Chapter(Base):
     start_offset = Column(Integer, nullable=False)
     end_offset = Column(Integer, nullable=False)
     status = Column(String(20), default="PENDING")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # 关系
     book = relationship("Book", back_populates="chapters")
@@ -123,7 +124,7 @@ class Outline(Base):
     parent_outline_id = Column(String(36), ForeignKey("outlines.outline_id"))
     status = Column(String(20), default="PENDING")
     error_message = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # 关系
     book = relationship("Book", back_populates="outlines")
@@ -143,7 +144,7 @@ class ErrorLog(Base):
     error_type = Column(String(50), nullable=False)
     error_message = Column(Text, nullable=False)
     stack_trace = Column(Text)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # 关系
     task = relationship("ProcessingTask", back_populates="errors")

@@ -3,7 +3,7 @@ AI小说拆书系统 - Mock Server
 基于 OpenAPI 规范的 Mock 服务，用于前端独立开发
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from fastapi import FastAPI, UploadFile, File, Form, Query, Path
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,7 +30,7 @@ MOCK_OUTLINES: Dict[str, Dict[str, Any]] = {}
 
 
 def _timestamp() -> str:
-    return datetime.utcnow().isoformat() + "Z"
+    return datetime.now(timezone.utc).isoformat() + "Z"
 
 
 def _success(data: Any) -> Dict[str, Any]:

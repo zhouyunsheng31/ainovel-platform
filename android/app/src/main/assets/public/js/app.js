@@ -344,6 +344,10 @@ class NovelPlatformApp {
             this.loadBookList();
         }
         
+        if (page === 'settings') {
+            this.loadSettings();
+        }
+        
         console.log('[App] 导航到页面:', page);
     }
     

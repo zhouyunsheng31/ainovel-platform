@@ -33,9 +33,17 @@ Base = declarative_base()
 
 
 async def init_db():
-    """初始化数据库（创建所有表）"""
+    """初始化数据库（创建所有表，并处理必要的表结构迁移）"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        from sqlalchemy import text, inspect as sa_inspect
+        def _migrate(sync_conn):
+            inspector = sa_inspect(sync_conn)
+            if 'books' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('books')]
+                if 'file_hash' not in columns:
+                    sync_conn.execute(text('ALTER TABLE books ADD COLUMN file_hash VARCHAR(64)'))
+        await conn.run_sync(_migrate)
 
 
 @asynccontextmanager

@@ -4,7 +4,7 @@ AI小说拆书系统 - 日志工具
 import logging
 import json
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class StructuredLogger:
@@ -27,7 +27,7 @@ class StructuredLogger:
         """格式化消息为结构化JSON"""
         log_data = {
             "message": message,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": self.logger.level
         }
         

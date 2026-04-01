@@ -29,7 +29,8 @@ class OutlineService:
     async def generate_chapter_outlines(
         self,
         chapters: List[Dict[str, Any]],
-        progress_callback=None
+        progress_callback=None,
+        on_chapter_complete=None
     ) -> List[Dict[str, Any]]:
         """
         并行生成所有章纲
@@ -37,6 +38,7 @@ class OutlineService:
         Args:
             chapters: 章节列表 [{"index": 0, "text": "..."}, ...]
             progress_callback: 进度回调函数
+            on_chapter_complete: 每完成一章时的回调 (chapter_index, result_dict)
         
         Returns:
             章纲结果列表
@@ -56,13 +58,28 @@ class OutlineService:
         ]
         
         try:
-            # 并行调用
+            completed_count = 0
+            total = len(chapters)
+
+            async def _on_item_done(index: int, raw_result):
+                nonlocal completed_count
+                completed_count += 1
+                if isinstance(raw_result, Exception) or (isinstance(raw_result, dict) and "error" in raw_result):
+                    error_message = str(raw_result) if isinstance(raw_result, Exception) else raw_result.get("error", "未知错误")
+                    item = {"index": index, "error": error_message, "status": "FAILED"}
+                else:
+                    item = {"index": index, "content": raw_result, "summary": raw_result.get("summary", ""), "status": "COMPLETED"}
+                if on_chapter_complete:
+                    await on_chapter_complete(index, item)
+                if progress_callback:
+                    await progress_callback(completed_count, total)
+
             results = await self.llm.batch_invoke(
                 inputs,
-                max_concurrency=10  # 最大并发数
+                max_concurrency=10,
+                on_item_complete=_on_item_done
             )
             
-            # 处理结果
             chapter_outlines = []
             success_count = 0
             error_count = 0
@@ -76,10 +93,6 @@ class OutlineService:
                         "status": "FAILED"
                     })
                     error_count += 1
-                    logger.error("章纲生成失败", extra={
-                        "chapter_index": i,
-                        "error_message": error_message
-                    })
                 else:
                     chapter_outlines.append({
                         "index": i,
@@ -88,9 +101,6 @@ class OutlineService:
                         "status": "COMPLETED"
                     })
                     success_count += 1
-                
-                if progress_callback:
-                    await progress_callback(i + 1, len(chapters))
             
             logger.info("章纲生成完成", extra={
                 "chapter_count": len(chapters),
@@ -107,7 +117,6 @@ class OutlineService:
                 "error_message": error_message,
                 "stack_trace": traceback.format_exc()
             })
-            # 返回失败结果
             return [{
                 "index": i,
                 "error": error_message,

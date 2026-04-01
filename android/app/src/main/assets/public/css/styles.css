@@ -560,6 +560,7 @@ body {
   color: var(--gray-500);
 }
 
+.status-icon.active,
 .status-icon.processing {
   background: rgba(59, 130, 246, 0.1);
   color: var(--info);
@@ -801,7 +802,6 @@ body {
 .list-container {
   max-height: 600px;
   overflow-y: auto;
-}
 }
 
 .outline-tree {
@@ -1378,12 +1378,12 @@ textarea {
     text-align: center;
   }
   
-  .nav-tabs {
+  .nav-links {
     justify-content: center;
     flex-wrap: wrap;
   }
   
-  .app-main {
+  .main-content {
     padding: var(--spacing-md);
   }
   
@@ -1399,14 +1399,29 @@ textarea {
     width: 100%;
   }
   
-  .book-selector {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
   .status-item {
     flex-direction: column;
     text-align: center;
+  }
+
+  .book-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .library-toolbar {
+    flex-direction: column;
+  }
+
+  .search-box {
+    min-width: 0;
+  }
+
+  .settings-container {
+    max-width: 100%;
   }
 }
 

@@ -11,6 +11,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Dep
 from typing import Optional
 import os
 import uuid
+import hashlib
 import aiofiles
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +53,7 @@ async def upload_book(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     author: Optional[str] = Form(None),
+    force: Optional[str] = Form("false"),
     db: AsyncSession = Depends(get_db),
     background_tasks: BackgroundTasks = None
 ):
@@ -59,6 +61,7 @@ async def upload_book(
     上传书籍文件
     支持 txt/epub/doc/docx/pdf 格式
     上传后自动启动后台处理流程
+    force=true 时跳过重复检测
     """
     # 1. 验证文件类型
     file_ext = os.path.splitext(file.filename or "")[1].lower()
@@ -87,15 +90,40 @@ async def upload_book(
             }
         )
     
-    # 4. 生成ID
+    # 4. 计算文件哈希
+    file_hash = hashlib.sha256(content).hexdigest()
+    
+    # 5. 重复检测（force != "true" 时）
+    if force.lower() != "true":
+        existing_result = await db.execute(
+            select(Book).where(Book.file_hash == file_hash)
+        )
+        existing_book = existing_result.scalar_one_or_none()
+        if existing_book:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "BOOK_ALREADY_EXISTS",
+                    "message": f"检测到重复书籍：{existing_book.title}",
+                    "details": {
+                        "existingBookId": existing_book.book_id,
+                        "existingTitle": existing_book.title,
+                        "existingOriginalName": existing_book.original_name,
+                        "existingStatus": existing_book.status,
+                        "fileHash": file_hash
+                    }
+                }
+            )
+    
+    # 6. 生成ID
     book_id = str(uuid.uuid4())
     task_id = str(uuid.uuid4())
     
-    # 5. 提取书名
+    # 7. 提取书名
     original_name = file.filename or "unknown"
     book_title = title or os.path.splitext(original_name)[0]
     
-    # 6. 保存文件
+    # 8. 保存文件
     data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "uploads")
     os.makedirs(data_dir, exist_ok=True)
     file_path = os.path.join(data_dir, f"{book_id}{file_ext}")
@@ -103,7 +131,7 @@ async def upload_book(
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(content)
     
-    # 7. 创建数据库记录
+    # 9. 创建数据库记录
     book = Book(
         book_id=book_id,
         title=book_title,
@@ -111,6 +139,7 @@ async def upload_book(
         file_type=SUPPORTED_FILE_TYPES[file_ext],
         file_path=file_path,
         file_size=file_size,
+        file_hash=file_hash,
         status=BookStatus.IDLE.value
     )
     db.add(book)
@@ -126,7 +155,7 @@ async def upload_book(
     
     await db.commit()
     
-    # 8. 启动后台处理任务
+    # 10. 启动后台处理任务
     await task_processor.start_processing(book_id, task_id)
     
     return UploadBookResponse(

@@ -5,9 +5,9 @@ AI小说拆书系统 - 任务处理服务
 import asyncio
 import traceback
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import async_session_factory
@@ -144,9 +144,9 @@ class TaskProcessor:
                     await send_error_message(task_id, "TEXT_PREPROCESS", 0, error_code, error_message)
                     return
                 
-                # 3. 章纲提取阶段
+                # 3. 章纲提取阶段（逐章保存）
                 await self._update_task_status(db, task_id, "PROCESSING", "CHAPTER_OUTLINE", 0)
-                logger.info("开始章纲提取", extra={
+                logger.info("开始章纲提取（逐章保存模式）", extra={
                     "task_id": task_id,
                     "book_id": book_id,
                     "stage": "CHAPTER_OUTLINE"
@@ -155,70 +155,171 @@ class TaskProcessor:
                 chapter_data = [{"index": c.index, "text": c.text} for c in chapters]
                 
                 try:
-                    # 运行LangGraph工作流
-                    result = await self.workflow.run(
-                        chapters=chapter_data,
-                        progress_callback=lambda stage, current, total: self._workflow_progress_callback(
-                            task_id, stage, current, total
+                    saved_chapter_outlines = []
+
+                    async def _on_chapter_saved(chapter_index: int, chapter_result: dict):
+                        outline_id = f"chapter_{book_id}_{chapter_index}"
+                        status = chapter_result.get("status", "FAILED")
+                        outline = Outline(
+                            outline_id=outline_id,
+                            book_id=book_id,
+                            outline_type="CHAPTER",
+                            outline_index=chapter_index,
+                            chapter_index=chapter_index,
+                            content_json=chapter_result.get("content", {}),
+                            summary=chapter_result.get("summary", ""),
+                            status=status,
+                            error_message=chapter_result.get("error") if status == "FAILED" else None
                         )
+                        async with async_session_factory() as save_db:
+                            existing = await save_db.execute(
+                                select(Outline).where(Outline.outline_id == outline_id)
+                            )
+                            if not existing.scalar_one_or_none():
+                                save_db.add(outline)
+                                await save_db.commit()
+                        saved_chapter_outlines.append(chapter_result)
+
+                    chapter_outlines = await self.outline_service.generate_chapter_outlines(
+                        chapter_data,
+                        progress_callback=lambda current, total: self._workflow_progress_callback(
+                            task_id, "CHAPTER_OUTLINE", current, total
+                        ),
+                        on_chapter_complete=_on_chapter_saved
                     )
-                    
-                    logger.info("工作流执行完成", extra={
+
+                    logger.info("章纲提取完成", extra={
                         "task_id": task_id,
                         "book_id": book_id,
-                        "stage": "WORKFLOW"
+                        "saved_count": len(saved_chapter_outlines),
+                        "total_count": len(chapter_data)
                     })
-                    
                 except Exception as e:
                     error_code = ErrorCodes.WORKFLOW_ERROR
-                    error_message = f"工作流执行失败: {str(e)}"
-                    logger.error("工作流执行失败", extra={
+                    error_message = f"章纲提取失败: {str(e)}"
+                    logger.error("章纲提取失败", extra={
                         "task_id": task_id,
                         "book_id": book_id,
                         "error_code": error_code,
                         "error_message": error_message,
-                        "stage": "WORKFLOW",
+                        "stage": "CHAPTER_OUTLINE",
                         "stack_trace": traceback.format_exc()
                     })
-                    await self._log_error(db, task_id, book_id, "WORKFLOW", None, error_code, error_message)
-                    await self._update_task_status(db, task_id, "FAILED", "WORKFLOW", 0)
+                    await self._log_error(db, task_id, book_id, "CHAPTER_OUTLINE", None, error_code, error_message)
+                    await self._update_task_status(db, task_id, "FAILED", "CHAPTER_OUTLINE", 0)
                     await self._update_book_status(db, book_id, BookStatus.FAILED.value)
-                    await send_error_message(task_id, "WORKFLOW", 0, error_code, error_message)
+                    await send_error_message(task_id, "CHAPTER_OUTLINE", 0, error_code, error_message)
                     return
-                
-                # 4. 保存结果
+
+                # 4. 粗纲生成阶段（逐阶段保存）
+                await self._update_task_status(db, task_id, "PROCESSING", "COARSE_OUTLINE", 0)
                 try:
-                    await self._save_outlines(db, book_id, result)
-                    logger.info("大纲保存完成", extra={
+                    coarse_outlines = await self.outline_service.generate_coarse_outlines(
+                        chapter_outlines,
+                        progress_callback=lambda current, total: self._workflow_progress_callback(
+                            task_id, "COARSE_OUTLINE", current, total
+                        )
+                    )
+                    await self._save_coarse_outlines(db, book_id, coarse_outlines)
+                    logger.info("粗纲生成完成", extra={
                         "task_id": task_id,
                         "book_id": book_id,
-                        "stage": "SAVE_OUTLINES"
+                        "coarse_count": len(coarse_outlines)
                     })
                 except Exception as e:
-                    error_code = ErrorCodes.OUTLINE_GENERATION_ERROR
-                    error_message = f"大纲保存失败: {str(e)}"
-                    logger.error("大纲保存失败", extra={
+                    error_code = ErrorCodes.WORKFLOW_ERROR
+                    error_message = f"粗纲生成失败: {str(e)}"
+                    logger.error("粗纲生成失败", extra={
                         "task_id": task_id,
                         "book_id": book_id,
                         "error_code": error_code,
                         "error_message": error_message,
-                        "stage": "SAVE_OUTLINES",
                         "stack_trace": traceback.format_exc()
                     })
-                    await self._log_error(db, task_id, book_id, "SAVE_OUTLINES", None, error_code, error_message)
-                    await self._update_task_status(db, task_id, "FAILED", "SAVE_OUTLINES", 0)
+                    await self._log_error(db, task_id, book_id, "COARSE_OUTLINE", None, error_code, error_message)
+                    await self._update_task_status(db, task_id, "FAILED", "COARSE_OUTLINE", 0)
                     await self._update_book_status(db, book_id, BookStatus.FAILED.value)
-                    await send_error_message(task_id, "SAVE_OUTLINES", 0, error_code, error_message)
+                    await send_error_message(task_id, "COARSE_OUTLINE", 0, error_code, error_message)
                     return
-                
-                # 5. 完成
+
+                # 5. 大纲生成阶段（逐阶段保存）
+                await self._update_task_status(db, task_id, "PROCESSING", "MAIN_OUTLINE", 0)
+                try:
+                    main_outlines = await self.outline_service.generate_main_outlines(
+                        coarse_outlines,
+                        progress_callback=lambda current, total: self._workflow_progress_callback(
+                            task_id, "MAIN_OUTLINE", current, total
+                        )
+                    )
+                    await self._save_main_outlines(db, book_id, main_outlines)
+                    logger.info("大纲生成完成", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "main_count": len(main_outlines)
+                    })
+                except Exception as e:
+                    error_code = ErrorCodes.WORKFLOW_ERROR
+                    error_message = f"大纲生成失败: {str(e)}"
+                    logger.error("大纲生成失败", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "error_code": error_code,
+                        "error_message": error_message,
+                        "stack_trace": traceback.format_exc()
+                    })
+                    await self._log_error(db, task_id, book_id, "MAIN_OUTLINE", None, error_code, error_message)
+                    await self._update_task_status(db, task_id, "FAILED", "MAIN_OUTLINE", 0)
+                    await self._update_book_status(db, book_id, BookStatus.FAILED.value)
+                    await send_error_message(task_id, "MAIN_OUTLINE", 0, error_code, error_message)
+                    return
+
+                # 6. 世界纲生成阶段
+                await self._update_task_status(db, task_id, "PROCESSING", "WORLD_OUTLINE", 0)
+                try:
+                    world_outline = await self.outline_service.generate_world_outline(
+                        main_outlines,
+                        progress_callback=lambda current, total: self._workflow_progress_callback(
+                            task_id, "WORLD_OUTLINE", current, total
+                        )
+                    )
+                    await self._save_world_outline(db, book_id, world_outline)
+                    logger.info("世界纲生成完成", extra={
+                        "task_id": task_id,
+                        "book_id": book_id
+                    })
+                except Exception as e:
+                    error_code = ErrorCodes.WORKFLOW_ERROR
+                    error_message = f"世界纲生成失败: {str(e)}"
+                    logger.error("世界纲生成失败", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "error_code": error_code,
+                        "error_message": error_message,
+                        "stack_trace": traceback.format_exc()
+                    })
+                    await self._log_error(db, task_id, book_id, "WORLD_OUTLINE", None, error_code, error_message)
+                    await self._update_task_status(db, task_id, "FAILED", "WORLD_OUTLINE", 0)
+                    await self._update_book_status(db, book_id, BookStatus.FAILED.value)
+                    await send_error_message(task_id, "WORLD_OUTLINE", 0, error_code, error_message)
+                    return
+
+                # 7. 补全层级关系
+                try:
+                    await self._link_outline_hierarchy(db, book_id, chapter_outlines, coarse_outlines, main_outlines)
+                except Exception as e:
+                    logger.warning("层级关系补全失败（不影响已保存数据）", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "error_message": str(e)
+                    })
+
+                # 8. 完成
                 await self._update_task_status(db, task_id, "COMPLETED", "WORLD_OUTLINE", 100)
                 await self._update_book_status(db, book_id, BookStatus.COMPLETED.value)
                 
-                # 发送完成消息
                 await send_completed_message(
                     task_id, book_id, len(chapters), 0,
-                    result.get("world_outline", {}).get("outline_id", "")
+                    f"world_{book_id}"
                 )
                 
                 logger.info("任务完成", extra={
@@ -284,9 +385,9 @@ class TaskProcessor:
             task.current_stage = current_stage
             
             if status == "PROCESSING" and not task.start_time:
-                task.start_time = datetime.utcnow()
+                task.start_time = datetime.now(timezone.utc)
             elif status in ["COMPLETED", "FAILED"]:
-                task.end_time = datetime.utcnow()
+                task.end_time = datetime.now(timezone.utc)
             
             if "total_chapters" in kwargs:
                 task.total_chapters = kwargs["total_chapters"]
@@ -345,12 +446,175 @@ class TaskProcessor:
         db.add(error)
         await db.commit()
     
+    async def _save_coarse_outlines(self, db: AsyncSession, book_id: str, coarse_outlines: list):
+        """保存粗纲到数据库"""
+        for co in coarse_outlines:
+            if co.get("status") == "COMPLETED":
+                oid = f"coarse_{book_id}_{co['index']}"
+                range_start = co.get("chapter_range", [0, 0])[0]
+                range_end = co.get("chapter_range", [0, 0])[1]
+                existing = await db.execute(
+                    select(Outline).where(Outline.outline_id == oid)
+                )
+                if existing.scalar_one_or_none():
+                    continue
+                source_ids = [
+                    f"chapter_{book_id}_{i}" for i in range(range_start, range_end + 1)
+                ]
+                outline = Outline(
+                    outline_id=oid,
+                    book_id=book_id,
+                    outline_type="COARSE",
+                    outline_index=co["index"],
+                    chapter_range_start=range_start,
+                    chapter_range_end=range_end,
+                    content_json=co.get("content", {}),
+                    summary=co.get("summary", ""),
+                    source_outline_ids=source_ids,
+                    status="COMPLETED"
+                )
+                db.add(outline)
+        await db.commit()
+
+    async def _save_main_outlines(self, db: AsyncSession, book_id: str, main_outlines: list):
+        """保存大纲到数据库"""
+        for mo in main_outlines:
+            if mo.get("status") == "COMPLETED":
+                oid = f"main_{book_id}_{mo['index']}"
+                existing = await db.execute(
+                    select(Outline).where(Outline.outline_id == oid)
+                )
+                if existing.scalar_one_or_none():
+                    continue
+                source_ids = [
+                    f"coarse_{book_id}_{ci}" for ci in mo.get("source_indices", [])
+                ]
+                outline = Outline(
+                    outline_id=oid,
+                    book_id=book_id,
+                    outline_type="MAIN",
+                    outline_index=mo["index"],
+                    content_json=mo.get("content", {}),
+                    summary=mo.get("summary", ""),
+                    source_outline_ids=source_ids,
+                    status="COMPLETED"
+                )
+                db.add(outline)
+        await db.commit()
+
+    async def _save_world_outline(self, db: AsyncSession, book_id: str, world_outline: dict):
+        """保存世界纲到数据库"""
+        if world_outline.get("status") == "COMPLETED":
+            wid = f"world_{book_id}"
+            existing = await db.execute(
+                select(Outline).where(Outline.outline_id == wid)
+            )
+            if not existing.scalar_one_or_none():
+                outline = Outline(
+                    outline_id=wid,
+                    book_id=book_id,
+                    outline_type="WORLD",
+                    outline_index=0,
+                    content_json=world_outline.get("content", {}),
+                    summary=world_outline.get("summary", ""),
+                    status="COMPLETED"
+                )
+                db.add(outline)
+                await db.commit()
+
+    async def _link_outline_hierarchy(self, db: AsyncSession, book_id: str,
+                                       chapter_outlines: list, coarse_outlines: list,
+                                       main_outlines: list):
+        """补全层级关系：世界纲←大纲←粗纲←章纲"""
+        world_id = f"world_{book_id}"
+
+        for mo in main_outlines:
+            if mo.get("status") == "COMPLETED":
+                oid = f"main_{book_id}_{mo['index']}"
+                await db.execute(
+                    update(Outline).where(Outline.outline_id == oid)
+                    .values(parent_outline_id=world_id)
+                )
+        await db.flush()
+
+        main_id_by_coarse_index = {}
+        for mo in main_outlines:
+            if mo.get("status") == "COMPLETED":
+                for ci in mo.get("source_indices", []):
+                    main_id_by_coarse_index[ci] = f"main_{book_id}_{mo['index']}"
+
+        for co in coarse_outlines:
+            if co.get("status") == "COMPLETED":
+                oid = f"coarse_{book_id}_{co['index']}"
+                parent_id = main_id_by_coarse_index.get(co["index"])
+                await db.execute(
+                    update(Outline).where(Outline.outline_id == oid)
+                    .values(parent_outline_id=parent_id)
+                )
+        await db.flush()
+
+        coarse_ids = {}
+        for co in coarse_outlines:
+            if co.get("status") == "COMPLETED":
+                coarse_ids[co["index"]] = f"coarse_{book_id}_{co['index']}"
+
+        for co in coarse_outlines:
+            if co.get("status") == "COMPLETED":
+                rs = co.get("chapter_range", [0, 0])[0]
+                re_ = co.get("chapter_range", [0, 0])[1]
+                parent_coarse_id = coarse_ids.get(co["index"])
+                for ch_idx in range(rs, re_ + 1):
+                    ch_oid = f"chapter_{book_id}_{ch_idx}"
+                    await db.execute(
+                        update(Outline).where(Outline.outline_id == ch_oid)
+                        .values(parent_outline_id=parent_coarse_id)
+                    )
+        await db.commit()
+
     async def _save_outlines(self, db: AsyncSession, book_id: str, result: dict):
-        """保存生成的纲结构，建立父子层级关系"""
+        """保存生成的纲结构，建立父子层级关系（自顶向下：世界纲→主纲→粗纲→章纲）"""
         chapter_ids = {}
         coarse_ids = {}
-        main_ids = []
+        main_id_by_index = {}
+        main_id_by_coarse_index = {}
         world_id = None
+
+        wo = result.get("world_outline", {})
+        if wo.get("status") == "COMPLETED":
+            wid = f"world_{book_id}"
+            outline = Outline(
+                outline_id=wid,
+                book_id=book_id,
+                outline_type="WORLD",
+                outline_index=0,
+                content_json=wo.get("content", {}),
+                summary=wo.get("summary", ""),
+                status="COMPLETED"
+            )
+            db.add(outline)
+            world_id = wid
+
+        await db.flush()
+
+        for mo in result.get("main_outlines", []):
+            if mo.get("status") == "COMPLETED":
+                oid = f"main_{book_id}_{mo['index']}"
+                outline = Outline(
+                    outline_id=oid,
+                    book_id=book_id,
+                    outline_type="MAIN",
+                    outline_index=mo["index"],
+                    content_json=mo.get("content", {}),
+                    summary=mo.get("summary", ""),
+                    parent_outline_id=world_id,
+                    status="COMPLETED"
+                )
+                db.add(outline)
+                main_id_by_index[mo["index"]] = oid
+                for ci in mo.get("source_indices", []):
+                    main_id_by_coarse_index[ci] = oid
+
+        await db.flush()
 
         for co in result.get("chapter_outlines", []):
             if co.get("status") == "COMPLETED":
@@ -379,7 +643,7 @@ class TaskProcessor:
                     chapter_ids[i] for i in range(range_start, range_end + 1)
                     if i in chapter_ids
                 ]
-                parent_id = main_ids[0] if main_ids else None
+                parent_id = main_id_by_coarse_index.get(co["index"])
                 outline = Outline(
                     outline_id=oid,
                     book_id=book_id,
@@ -398,59 +662,20 @@ class TaskProcessor:
 
         await db.flush()
 
-        for mo in result.get("main_outlines", []):
-            if mo.get("status") == "COMPLETED":
-                oid = f"main_{book_id}_{mo['index']}"
-                parent = world_id
-                outline = Outline(
-                    outline_id=oid,
-                    book_id=book_id,
-                    outline_type="MAIN",
-                    outline_index=mo["index"],
-                    content_json=mo.get("content", {}),
-                    summary=mo.get("summary", ""),
-                    parent_outline_id=parent,
-                    status="COMPLETED"
-                )
-                db.add(outline)
-                main_ids.append(oid)
-
-        await db.flush()
-
-        if main_ids:
-            for cid in coarse_ids.values():
-                result_obj = await db.execute(
-                    select(Outline).where(Outline.outline_id == cid)
-                )
-                coarse_obj = result_obj.scalar_one_or_none()
-                if coarse_obj and not coarse_obj.parent_outline_id:
-                    coarse_obj.parent_outline_id = main_ids[0]
-
-        wo = result.get("world_outline", {})
-        if wo.get("status") == "COMPLETED":
-            wid = f"world_{book_id}"
-            outline = Outline(
-                outline_id=wid,
-                book_id=book_id,
-                outline_type="WORLD",
-                outline_index=0,
-                content_json=wo.get("content", {}),
-                summary=wo.get("summary", ""),
-                status="COMPLETED"
+        for ch_idx, ch_oid in chapter_ids.items():
+            parent_coarse_id = None
+            for co in result.get("coarse_outlines", []):
+                if co.get("status") == "COMPLETED":
+                    rs = co.get("chapter_range", [0, 0])[0]
+                    re_ = co.get("chapter_range", [0, 0])[1]
+                    if rs <= ch_idx <= re_:
+                        parent_coarse_id = coarse_ids.get(co["index"])
+                        break
+            await db.execute(
+                update(Outline)
+                .where(Outline.outline_id == ch_oid)
+                .values(parent_outline_id=parent_coarse_id)
             )
-            db.add(outline)
-            world_id = wid
-
-        await db.flush()
-
-        if world_id:
-            for mid in main_ids:
-                result_obj = await db.execute(
-                    select(Outline).where(Outline.outline_id == mid)
-                )
-                main_obj = result_obj.scalar_one_or_none()
-                if main_obj:
-                    main_obj.parent_outline_id = world_id
 
         await db.commit()
 
