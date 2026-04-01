@@ -3,6 +3,7 @@ AI小说拆书系统 - 任务处理服务
 负责后台处理流程的启动和管理
 """
 import asyncio
+import traceback
 from typing import Optional
 from datetime import datetime
 
@@ -20,6 +21,8 @@ from app.api.websocket import (
     send_progress_update,
     send_error_message, send_completed_message
 )
+from app.services.error_codes import ErrorCodes, ErrorMessages
+from app.services.logging import logger
 
 
 class TaskProcessor:
@@ -45,6 +48,13 @@ class TaskProcessor:
         """
         async with async_session_factory() as db:
             try:
+                # 记录任务开始
+                logger.info("开始处理书籍", extra={
+                    "task_id": task_id,
+                    "book_id": book_id,
+                    "stage": "START"
+                })
+                
                 # 更新任务状态
                 await self._update_task_status(db, task_id, "PROCESSING", "FILE_UPLOAD", 0)
                 await self._update_book_status(db, book_id, BookStatus.PROCESSING.value)
@@ -52,64 +62,154 @@ class TaskProcessor:
                 # 1. 获取书籍信息
                 book = await self._get_book(db, book_id)
                 if not book:
-                    await self._log_error(db, task_id, book_id, "FILE_UPLOAD", None, "BOOK_NOT_FOUND", "书籍不存在")
+                    error_code = ErrorCodes.BOOK_NOT_FOUND
+                    error_message = ErrorMessages.get_message(error_code)
+                    logger.error("书籍不存在", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "error_code": error_code,
+                        "stage": "FILE_UPLOAD"
+                    })
+                    await self._log_error(db, task_id, book_id, "FILE_UPLOAD", None, error_code, error_message)
+                    await send_error_message(task_id, "FILE_UPLOAD", 0, error_code, error_message)
                     return
                 
                 # 2. 文本预处理阶段
                 await self._update_task_status(db, task_id, "PROCESSING", "TEXT_PREPROCESS", 0)
+                logger.info("开始文本预处理", extra={
+                    "task_id": task_id,
+                    "book_id": book_id,
+                    "stage": "TEXT_PREPROCESS"
+                })
                 
-                # 提取文本
-                text, encoding = await self.file_processor.extract_text(
-                    book.file_path, book.file_type
-                )
-                
-                # 更新编码
-                book.encoding = encoding
-                await db.commit()
-                
-                # 分割章节
-                chapters = self.text_splitter.split_into_chapters(text)
-                book.total_chapters = len(chapters)
-                await db.commit()
-                
-                # 保存章节数据
-                for chapter in chapters:
-                    db_chapter = Chapter(
-                        chapter_id=f"{book_id}_{chapter.index}",
-                        book_id=book_id,
-                        chapter_index=chapter.index,
-                        original_text=chapter.text,
-                        word_count=chapter.word_count,
-                        start_offset=chapter.start_offset,
-                        end_offset=chapter.end_offset
+                try:
+                    # 提取文本
+                    text, encoding = await self.file_processor.extract_text(
+                        book.file_path, book.file_type
                     )
-                    db.add(db_chapter)
-                await db.commit()
-                
-                await self._update_task_status(db, task_id, "PROCESSING", "TEXT_PREPROCESS", 100, 
+                    
+                    # 更新编码
+                    book.encoding = encoding
+                    await db.commit()
+                    
+                    # 分割章节
+                    chapters = self.text_splitter.split_into_chapters(text)
+                    book.total_chapters = len(chapters)
+                    await db.commit()
+                    
+                    # 保存章节数据
+                    for chapter in chapters:
+                        db_chapter = Chapter(
+                            chapter_id=f"{book_id}_{chapter.index}",
+                            book_id=book_id,
+                            chapter_index=chapter.index,
+                            original_text=chapter.text,
+                            word_count=chapter.word_count,
+                            start_offset=chapter.start_offset,
+                            end_offset=chapter.end_offset
+                        )
+                        db.add(db_chapter)
+                    await db.commit()
+                    
+                    await self._update_task_status(db, task_id, "PROCESSING", "TEXT_PREPROCESS", 100, 
                                                total_chapters=len(chapters))
-                
-                # 发送WebSocket进度
-                await send_progress_update(
-                    task_id, "TEXT_PREPROCESS", 100, 1, 1,
-                    f"文本预处理完成，共{len(chapters)}章"
-                )
+                    
+                    # 发送WebSocket进度
+                    await send_progress_update(
+                        task_id, "TEXT_PREPROCESS", 100, 1, 1,
+                        f"文本预处理完成，共{len(chapters)}章"
+                    )
+                    
+                    logger.info("文本预处理完成", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "stage": "TEXT_PREPROCESS",
+                        "total_chapters": len(chapters)
+                    })
+                    
+                except Exception as e:
+                    error_code = ErrorCodes.TEXT_PARSE_ERROR
+                    error_message = f"文本预处理失败: {str(e)}"
+                    logger.error("文本预处理失败", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "error_code": error_code,
+                        "error_message": error_message,
+                        "stage": "TEXT_PREPROCESS",
+                        "stack_trace": traceback.format_exc()
+                    })
+                    await self._log_error(db, task_id, book_id, "TEXT_PREPROCESS", None, error_code, error_message)
+                    await self._update_task_status(db, task_id, "FAILED", "TEXT_PREPROCESS", 0)
+                    await self._update_book_status(db, book_id, BookStatus.FAILED.value)
+                    await send_error_message(task_id, "TEXT_PREPROCESS", 0, error_code, error_message)
+                    return
                 
                 # 3. 章纲提取阶段
                 await self._update_task_status(db, task_id, "PROCESSING", "CHAPTER_OUTLINE", 0)
+                logger.info("开始章纲提取", extra={
+                    "task_id": task_id,
+                    "book_id": book_id,
+                    "stage": "CHAPTER_OUTLINE"
+                })
                 
                 chapter_data = [{"index": c.index, "text": c.text} for c in chapters]
                 
-                # 运行LangGraph工作流
-                result = await self.workflow.run(
-                    chapters=chapter_data,
-                    progress_callback=lambda stage, current, total: self._workflow_progress_callback(
-                        task_id, stage, current, total
+                try:
+                    # 运行LangGraph工作流
+                    result = await self.workflow.run(
+                        chapters=chapter_data,
+                        progress_callback=lambda stage, current, total: self._workflow_progress_callback(
+                            task_id, stage, current, total
+                        )
                     )
-                )
+                    
+                    logger.info("工作流执行完成", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "stage": "WORKFLOW"
+                    })
+                    
+                except Exception as e:
+                    error_code = ErrorCodes.WORKFLOW_ERROR
+                    error_message = f"工作流执行失败: {str(e)}"
+                    logger.error("工作流执行失败", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "error_code": error_code,
+                        "error_message": error_message,
+                        "stage": "WORKFLOW",
+                        "stack_trace": traceback.format_exc()
+                    })
+                    await self._log_error(db, task_id, book_id, "WORKFLOW", None, error_code, error_message)
+                    await self._update_task_status(db, task_id, "FAILED", "WORKFLOW", 0)
+                    await self._update_book_status(db, book_id, BookStatus.FAILED.value)
+                    await send_error_message(task_id, "WORKFLOW", 0, error_code, error_message)
+                    return
                 
                 # 4. 保存结果
-                await self._save_outlines(db, book_id, result)
+                try:
+                    await self._save_outlines(db, book_id, result)
+                    logger.info("大纲保存完成", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "stage": "SAVE_OUTLINES"
+                    })
+                except Exception as e:
+                    error_code = ErrorCodes.OUTLINE_GENERATION_ERROR
+                    error_message = f"大纲保存失败: {str(e)}"
+                    logger.error("大纲保存失败", extra={
+                        "task_id": task_id,
+                        "book_id": book_id,
+                        "error_code": error_code,
+                        "error_message": error_message,
+                        "stage": "SAVE_OUTLINES",
+                        "stack_trace": traceback.format_exc()
+                    })
+                    await self._log_error(db, task_id, book_id, "SAVE_OUTLINES", None, error_code, error_message)
+                    await self._update_task_status(db, task_id, "FAILED", "SAVE_OUTLINES", 0)
+                    await self._update_book_status(db, book_id, BookStatus.FAILED.value)
+                    await send_error_message(task_id, "SAVE_OUTLINES", 0, error_code, error_message)
+                    return
                 
                 # 5. 完成
                 await self._update_task_status(db, task_id, "COMPLETED", "WORLD_OUTLINE", 100)
@@ -121,21 +221,44 @@ class TaskProcessor:
                     result.get("world_outline", {}).get("outline_id", "")
                 )
                 
+                logger.info("任务完成", extra={
+                    "task_id": task_id,
+                    "book_id": book_id,
+                    "stage": "COMPLETED",
+                    "total_chapters": len(chapters)
+                })
+                
             except Exception as e:
                 # 记录错误
                 error_msg = str(e)
-                import traceback
-                traceback.print_exc()
-                await self._log_error(db, task_id, book_id, "PROCESSING", None, "PROCESSING_ERROR", error_msg)
+                error_code = ErrorCodes.SYSTEM_ERROR
+                logger.error("任务处理失败", extra={
+                    "task_id": task_id,
+                    "book_id": book_id,
+                    "error_code": error_code,
+                    "error_message": error_msg,
+                    "stage": "PROCESSING",
+                    "stack_trace": traceback.format_exc()
+                })
+                await self._log_error(db, task_id, book_id, "PROCESSING", None, error_code, error_msg)
                 await self._update_task_status(db, task_id, "FAILED", "PROCESSING", 0)
                 await self._update_book_status(db, book_id, BookStatus.FAILED.value)
                 
                 # 发送错误消息
-                await send_error_message(task_id, "PROCESSING", 0, "PROCESSING_ERROR", error_msg)
+                await send_error_message(task_id, "PROCESSING", 0, error_code, error_msg)
     
     async def _workflow_progress_callback(self, task_id: str, stage: str, current: int, total: int):
         """工作流进度回调"""
         progress = int((current / total) * 100) if total > 0 else 0
+        
+        # 记录进度日志
+        logger.info("工作流进度更新", extra={
+            "task_id": task_id,
+            "stage": stage,
+            "progress": progress,
+            "current": current,
+            "total": total
+        })
         
         await send_progress_update(
             task_id, stage, progress, total, current,
