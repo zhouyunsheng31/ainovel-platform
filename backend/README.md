@@ -149,16 +149,24 @@ python main.py
 
 > 完整收尾计划见项目根目录 [docs/后续开发规划.md](../docs/后续开发规划.md)
 
+### 已完成
 - [x] 实现LangGraph工作流编排（outline_graph.py 已完成）
 - [x] LLM调用封装（llm_service.py 已完成）
 - [x] 四层纲生成服务（outline_service.py 已完成）
 - [x] WebSocket实时推送（websocket.py 已完成）
 - [x] 门禁命令标准化（gate-check.ps1 已完成）
-- [ ] 密钥清理与轮换（P0）
-- [ ] 工作流循环依赖解耦（P2）
-- [ ] 工作流测试纳入pytest（P2）
+- [x] 错误码统一（error_codes.py 已完成）
+- [x] 结构化日志增强（logging.py 已完成）
+- [x] 工作流测试纳入pytest（test_outline_graph.py 已完成）
+- [x] 多章节与多层级回归测试（test_multilevel_regression.py 已完成）
+- [x] 真实LLM冒烟测试（test_llm_smoke.py 已完成）
+
+### 后续优化（非MVP必需）
 - [ ] 集成LangSmith监控（P5）
+- [ ] Python 3.14 兼容告警治理（P5-1）
 - [ ] 添加任务队列（Celery/RQ）
 - [ ] 实现断点续传
 - [ ] 添加用户认证
 - [ ] 性能优化和缓存
+
+> **当前状态**：P6-2 文档与清单冻结已完成，项目进入发布准备阶段
